@@ -331,31 +331,38 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 	joint_offset = np.array([r1, 0, 0])
 	last_matrix[0:3, -1] = world_origin + joint_offset
 	ic(last_matrix)
-
+	
 	for i, phi in enumerate(list(Phi)):
 
 		Li : float = lengths[i]
 
-		# print(f"Angle is {phi}")
+		print(f"Angle is {phi}")
 		# print(f"Generating rotation matrix for part {i}")
 
-		end_effector_loc = last_matrix[0:3, -1] + np.array([lengths[i], 0 , 0])
-		if i > 1 and i < len(Phi):
-			end_effector_loc += np.array([2*r1, 0, 0])
+		# if i > 1 and i < len(Phi):
+		# 	end_effector_loc += np.array([2*r1, 0, 0])
 
-		print(f"Starting L{Li} with global offset of {end_effector_loc}")
-		print(f"Starting L{Li} with local offset of {end_effector_loc - world_origin}")
-		ic(end_effector_loc)
-		current_transform = get_rotation_and_translation_matrix(phi, end_effector_loc, axis_name="z")
+		# get current Li plus some offset due to the joint
+		curr_Li_vec = np.array([Li , 0 , 0])
+		if i != len(Phi) - 1 and i != 0:
+			curr_Li_vec = curr_Li_vec +  2 * np.array([r1, 0, 0])
+
+		# multiply the Li vector into the last matrix
+		last_offset = last_matrix[0:3, -1]
+		current_transform = get_rotation_and_translation_matrix(phi, last_offset, axis_name="z")
+		new_end_effector = apply_transformation(current_transform, np.expand_dims(curr_Li_vec, axis=1))
+
 		ic(current_transform)
-
-		answers.append( apply_transformation(current_transform, np.expand_dims(end_effector_loc, axis=1)))
-
+		ic(new_end_effector)
+		
+		answers.append(new_end_effector)
 		last_matrix = current_transform
+		last_matrix[0:3, -1] = new_end_effector.squeeze(1)
+
 
 	assert len(answers) == 4
-	ic(last_matrix)
-	e : np.array = last_matrix[0:3, -1]
+	ic(current_transform)
+	e : np.array = current_transform[0:3, -1]
 	print(f"Final position is {e}")
 	answers.append(e)
 
@@ -492,17 +499,35 @@ def main():
 
 
 if __name__ == '__main__':
-		# main()
+
+	# print("##############################")
+	# print("  Assertion 2")
+	# print("##############################")
+	# 	# main()
+	# # Lentghs of the parts
+	# L1, L2, L3, L4 = [5, 8, 3, 0]
+	# Phi = np.array([0, 0, 0, 0])
+	# T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
+	
+	# actual = e
+	# expected = np.array([21, 2,  0. ])
+
+	# print(f"{expected=}, {actual=}")
+	# assert np.allclose(expected, actual)
+
+
+	print("##############################")
+	print("  Assertion 1")
+	print("##############################")
+
+
 	# Lentghs of the parts
 	L1, L2, L3, L4 = [5, 8, 3, 0]
-	Phi = np.array([0, 0, 0, 0])
+	Phi = np.array([30, -50, -30, 0])
 	T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
 	
 	actual = e
-	expected = np.array([21, 2,  0. ])
+	expected = np.array([18.47772028, -0.71432837,  0. ])
 
 	print(f"{expected=}, {actual=}")
 	assert np.allclose(expected, actual)
-
-
-
