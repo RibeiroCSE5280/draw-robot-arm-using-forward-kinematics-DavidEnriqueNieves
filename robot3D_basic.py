@@ -8,6 +8,7 @@ import numpy as np
 from icecream import ic
 from typing import List
 
+
 def RotationMatrix(theta, axis_name):
 		""" calculate single rotation of $theta$ matrix around x,y or z
 				code from: https://programming-surgeon.com/en/euler-angle-python-en/
@@ -306,6 +307,33 @@ def create_frame(current_transform : np.array, color, height : float, offset : f
 	Frame.apply_transform(current_transform)
 	return Frame
 
+def gen_mesh_from_transformation(Li : float, current_transform : np.array, current_Li_vec : np.array, color : str, mesh : Mesh = None) -> Mesh:
+
+	if(mesh == None):
+		mesh = Cylinder
+
+		# Now, let's create a cylinder and add it to the local coordinate frame
+		link1_mesh = Cylinder(r=0.4, 
+													height=Li, 
+													pos = current_Li_vec/2,
+													c=color, 
+													alpha=.8, 
+													axis=(1,0,0)
+													)
+	elif(mesh == Sphere):
+		# Now, let's create a cylinder and add it to the local coordinate frame
+		link1_mesh = Sphere(r=0.4, 
+													pos = current_Li_vec,
+													alpha=.8, 
+													)
+	
+	# Combine all parts into a single object 
+	Frame =  link1_mesh
+
+	# Transform the part to position it at its correct location and orientation 
+	Frame.apply_transform(current_transform)  
+	return Frame
+
 
 
 def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : float):
@@ -313,6 +341,7 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 	# begin by drawing the robot in its base form
 
 	vp = Plotter()
+	axes = Axes(xrange=(0,20), yrange=(-2,10), zrange=(0,6))
 	colors : List[str] = ["yellow", "green", "red", "blue"]
 
 	lengths : List[float] = [L1,L2,L3, L4]
@@ -324,13 +353,17 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 	last_matrix : np.array = np.eye(4)
 
-	# Also create a sphere to show as an example of a joint
 	r1 = 0.4
 
 	world_origin = np.array([3,2,0])
 	joint_offset = np.array([r1, 0, 0])
 	last_matrix[0:3, -1] = world_origin + joint_offset
 	ic(last_matrix)
+
+	frames : List[Mesh] = []
+
+	cumulative_mats : List[np.array] = []
+	cumulative_mats.append(last_matrix)
 	
 	for i, phi in enumerate(list(Phi)):
 
@@ -343,26 +376,32 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		# 	end_effector_loc += np.array([2*r1, 0, 0])
 
 		# get current Li plus some offset due to the joint
-		curr_Li_vec = np.array([Li , 0 , 0])
-		if i != len(Phi) - 1 and i != 0:
-			curr_Li_vec = curr_Li_vec +  2 * np.array([r1, 0, 0])
+		neutral_Li_vec = np.array([Li , 0 , 0])
+		if i != len(Phi) - 1 and i >0:
+			neutral_Li_vec = neutral_Li_vec +  2 * np.array([r1, 0, 0])
 
 		# multiply the Li vector into the last matrix
-		last_offset = last_matrix[0:3, -1]
-		current_transform = get_rotation_and_translation_matrix(phi, last_offset, axis_name="z")
-		new_end_effector = apply_transformation(current_transform, np.expand_dims(curr_Li_vec, axis=1))
-
+		current_transform = get_rotation_and_translation_matrix(-1 * phi, neutral_Li_vec, axis_name="z")
 		ic(current_transform)
-		ic(new_end_effector)
-		
-		answers.append(new_end_effector)
+		# need to add the offset of the bottom half of the joint to the current_transform matrix
+		frames.append(gen_mesh_from_transformation(Li, current_transform, neutral_Li_vec, color=colors[i], mesh=Sphere))
+		frames.append(gen_mesh_from_transformation(Li, current_transform, neutral_Li_vec, color=colors[i]))
+
+		cumulative_transform = np.eye(4)
+		for mat in cumulative_mats:
+			cumulative_transform = mat @ cumulative_transform
+		# print(f"Final cumulative transformation matrix is ")
+		# ic(cumulative_transform)
+
+		answers.append(cumulative_transform[0:3, -1])
+		cumulative_mats.append(current_transform)
+
 		last_matrix = current_transform
-		last_matrix[0:3, -1] = new_end_effector.squeeze(1)
 
-
+	vp.show(frames, axes, viewup="z" ,interactive=True)
 	assert len(answers) == 4
 	ic(current_transform)
-	e : np.array = current_transform[0:3, -1]
+	e : np.array = cumulative_transform[0:3, -1]
 	print(f"Final position is {e}")
 	answers.append(e)
 
@@ -500,20 +539,22 @@ def main():
 
 if __name__ == '__main__':
 
-	# print("##############################")
-	# print("  Assertion 2")
-	# print("##############################")
-	# 	# main()
-	# # Lentghs of the parts
-	# L1, L2, L3, L4 = [5, 8, 3, 0]
-	# Phi = np.array([0, 0, 0, 0])
-	# T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
+	print("##############################")
+	print("  Assertion 2")
+	print("##############################")
+		# main()
+	# Lentghs of the parts
+	L1, L2, L3, L4 = [5, 8, 3, 0]
+	Phi = np.array([0, 0, 0, 0])
+	T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
+	ic((T_01, T_02, T_03, T_04))
 	
-	# actual = e
-	# expected = np.array([21, 2,  0. ])
+	actual = e
+	expected = np.array([21, 2,  0. ])
 
-	# print(f"{expected=}, {actual=}")
-	# assert np.allclose(expected, actual)
+	print(f"{expected=}, {actual=}")
+	assert1 = np.allclose(expected, actual)
+	ic(assert1)
 
 
 	print("##############################")
@@ -530,4 +571,8 @@ if __name__ == '__main__':
 	expected = np.array([18.47772028, -0.71432837,  0. ])
 
 	print(f"{expected=}, {actual=}")
-	assert np.allclose(expected, actual)
+	assert2 = np.allclose(expected, actual)
+	ic(assert2)
+
+	if(assert1 and assert2):
+		print("You win!")
