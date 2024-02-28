@@ -385,7 +385,7 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 	world_origin = np.array([3,2,0])
 	joint_offset = np.array([r1, 0, 0])
-	initial_matrix[0:3, -1] = world_origin
+	initial_matrix[0:3, -1] = world_origin - joint_offset
 	ic(initial_matrix)
 
 	frames : List[Mesh] = []
@@ -395,7 +395,10 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 	first_zero_index = lengths.index(0)
 	ic(first_zero_index)
-	
+
+	phi_mult : int = 1
+	joint_offset_mat = get_rotation_and_translation_matrix(0, joint_offset, axis_name="z")
+
 	for i, phi in enumerate(list(Phi)):
 
 		Li : float = lengths[i]
@@ -422,17 +425,17 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		# answers.append(cumulative_transform[0:3, -1])
 		answers.append(np.eye(4))
 
-		phi_mult : int = 1
-	
-
 		if i == 0:
 			pre_offset_mat = get_rotation_and_translation_matrix(phi_mult * phi, joint_offset, axis_name="z")
 		elif i < first_zero_index:
-			pre_offset_mat = get_rotation_and_translation_matrix(0, joint_offset, axis_name="z")
+			pre_offset_mat = joint_offset_mat
 		else:
 			pre_offset_mat = np.eye(4)
 
 		cumulative_mats.append(pre_offset_mat)
+		if i == 0:
+			cumulative_mats.append(joint_offset_mat)
+
 		cumulative_mats.append(current_transform)
 
 		post_offset_mat = np.eye(4)
@@ -526,4 +529,5 @@ if __name__ == '__main__':
 
 	
 	assert_1()
-	# assert_2()
+	assert_2()
+	assert_3()
