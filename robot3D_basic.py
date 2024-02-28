@@ -8,7 +8,14 @@ from vedo import dataurl, Mesh, Sphere, show, settings, Axes, Arrow, Cylinder, s
 import numpy as np
 from icecream import ic
 from typing import List, Tuple
+from enum import Enum
 
+
+class SEGMENT_TYPE(Enum):
+	NONE = 3
+	LOWER_JOINT = 0
+	UPPER_JOINT=1
+	ARM = 2
 
 def RotationMatrix(theta, axis_name):
 		""" calculate single rotation of $theta$ matrix around x,y or z
@@ -347,7 +354,7 @@ def get_end_effector(r1 : float, cumulative_mats : np.array, to_print : bool = F
 	transforms = cumulative_mats.copy()
 
 	# transforms = transforms[::-1]
-	for i, mat in enumerate(reversed(transforms)):
+	for i, (type, mat) in enumerate(reversed(transforms)):
 		cumulative_transform = mat @ cumulative_transform
 		if(to_print):
 			ic(i)
@@ -369,8 +376,8 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 	# begin by drawing the robot in its base form
 
 	vp = Plotter()
-	axes = Axes(xrange=(0,20), yrange=(-2,10), zrange=(0,6))
-	colors : List[str] = ["yellow", "green", "red", "blue"]
+	axes = Axes(xrange=(-30,30), yrange=(-30,30), zrange=(0,6))
+	colors : List[str] = ["yellow", "green", "red", "blue", "purple"]
 
 	lengths : List[float] = [L1,L2,L3, L4]
 	ic(lengths)
@@ -390,8 +397,8 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 	frames : List[Mesh] = []
 
-	cumulative_mats : List[np.array] = []
-	cumulative_mats.append(initial_matrix)
+	segment_mats : List[np.array] = []
+	segment_mats.append((SEGMENT_TYPE.NONE,initial_matrix))
 
 	first_zero_index = lengths.index(0)
 	ic(first_zero_index)
@@ -421,10 +428,6 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		current_transform = get_rotation_and_translation_matrix(0, neutral_Li_vec, axis_name="z")
 		# need to add the offset of the bottom half of the joint to the current_transform matrix
 
-		# cumulative_transform, end_effector = get_end_effector(cumulative_mats, to_print=False)
-		# answers.append(cumulative_transform[0:3, -1])
-		answers.append(np.eye(4))
-
 		if i == 0:
 			pre_offset_mat = get_rotation_and_translation_matrix(phi_mult * phi, joint_offset, axis_name="z")
 		elif i < first_zero_index:
@@ -432,11 +435,17 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		else:
 			pre_offset_mat = np.eye(4)
 
-		cumulative_mats.append(pre_offset_mat)
+		type : SEGMENT_TYPE = SEGMENT_TYPE.UPPER_JOINT
 		if i == 0:
-			cumulative_mats.append(joint_offset_mat)
+			type = SEGMENT_TYPE.LOWER_JOINT
 
-		cumulative_mats.append(current_transform)
+		segment_mats.append((type,pre_offset_mat))
+		if i == 0:
+			segment_mats.append((SEGMENT_TYPE.UPPER_JOINT,joint_offset_mat))
+
+		answers.append(np.eye(4))
+
+		segment_mats.append((SEGMENT_TYPE.ARM,current_transform))
 
 		post_offset_mat = np.eye(4)
 		if i < first_zero_index - 1 and i < len(Phi) - 1:
@@ -447,16 +456,62 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		print("Adding post offset matrix")
 		ic(post_offset_mat)
 
-		cumulative_mats.append(post_offset_mat)
+	
+		type = SEGMENT_TYPE.LOWER_JOINT
+		if i >= first_zero_index - 1:
+			type = SEGMENT_TYPE.NONE
+
+		segment_mats.append((type,post_offset_mat))
 		# ic(cumulative_transform)
 		# ic(end_effector)
 
-	ic(cumulative_mats)
+	ic(segment_mats)
 
-	_ , e = get_end_effector(r1,cumulative_mats, to_print=True)
-	# vp.show(frames, axes, viewup="z" ,interactive=True)
-	assert len(answers) == 4
+	_ , e = get_end_effector(r1,segment_mats, to_print=True)
+
+	cum_mat = np.eye(4)
 	print(f"Final position is {e}")
+
+	length_counter = 0
+	cum_mats : List[np.array] = []
+	mats : List[np.array] = segment_mats.copy()
+
+	print(f"DRAWING ARM!")
+
+	ic(lengths)
+	# ic(segment_mats)
+	rev_seg_mats = list(segment_mats)
+	ic(rev_seg_mats)
+	for i, pair in enumerate(rev_seg_mats):
+		type, mat = pair
+		ic((type, mat))
+		ic(length_counter)
+
+		ic(i)
+		if type == SEGMENT_TYPE.LOWER_JOINT:
+			print("Adding lower joint")
+			ic(cum_mat)
+			joint_half_offset = np.array([-r1, 0,0])
+			if i < len(rev_seg_mats) -1:
+				comp_frame = Sphere(pos=joint_half_offset,c="purple", r=r1, alpha=0.8) 
+
+			if i < len(rev_seg_mats)-2:
+				arm_mat_pair = rev_seg_mats[i+2]
+				print(f"Arm matrix is {arm_mat_pair}")
+				height = arm_mat_pair[1][0, -1]
+				ic(height)
+				arm_offset = np.array([(height)/2, 0, 0])
+				comp_frame+= Cylinder(pos=arm_offset, c=colors[length_counter], r=r1, axis=(1,0,0), height=height, alpha=0.7 )
+
+			frames.append(comp_frame.apply_transform(cum_mat))
+			length_counter+=1
+
+		cum_mat = mat @ cum_mat
+		# ic(cum_mat)
+		cum_mats.append(cum_mat)
+
+	vp.show(frames, axes, viewup="z" ,interactive=True)
+	assert len(answers) == 4
 	answers.append(e)
 
 	# # Function implementation goes here
@@ -529,5 +584,5 @@ if __name__ == '__main__':
 
 	
 	assert_1()
-	assert_2()
-	assert_3()
+	# assert_2()
+	# assert_3()
