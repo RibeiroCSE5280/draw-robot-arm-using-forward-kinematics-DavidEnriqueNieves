@@ -370,6 +370,8 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		Li : float = lengths[i]
 
 		print(f"Angle is {phi}")
+		ic(i)
+		ic(Li)
 		# print(f"Generating rotation matrix for part {i}")
 
 		# if i > 1 and i < len(Phi):
@@ -377,8 +379,9 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 		# get current Li plus some offset due to the joint
 		neutral_Li_vec = np.array([Li , 0 , 0])
-		if i != len(Phi) - 1 and i >0:
+		if i != 0:
 			neutral_Li_vec = neutral_Li_vec +  2 * np.array([r1, 0, 0])
+
 
 		# multiply the Li vector into the last matrix
 		current_transform = get_rotation_and_translation_matrix(-1 * phi, neutral_Li_vec, axis_name="z")
@@ -388,6 +391,7 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		frames.append(gen_mesh_from_transformation(Li, current_transform, neutral_Li_vec, color=colors[i]))
 
 		cumulative_transform = np.eye(4)
+
 		for mat in cumulative_mats:
 			cumulative_transform = mat @ cumulative_transform
 		# print(f"Final cumulative transformation matrix is ")
@@ -400,7 +404,6 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 	vp.show(frames, axes, viewup="z" ,interactive=True)
 	assert len(answers) == 4
-	ic(current_transform)
 	e : np.array = cumulative_transform[0:3, -1]
 	print(f"Final position is {e}")
 	answers.append(e)
