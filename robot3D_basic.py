@@ -351,19 +351,19 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 	assert Phi.shape == (4, 1) or Phi.shape==(4,), f"Phi array is of improper shape! {Phi.shape}, expected {(4,1)} or {(4,)}"
 
-	last_matrix : np.array = np.eye(4)
+	initial_matrix : np.array = np.eye(4)
 
 	r1 = 0.4
 
 	world_origin = np.array([3,2,0])
 	joint_offset = np.array([r1, 0, 0])
-	last_matrix[0:3, -1] = world_origin + joint_offset
-	ic(last_matrix)
+	initial_matrix[0:3, -1] = world_origin
+	ic(initial_matrix)
 
 	frames : List[Mesh] = []
 
 	cumulative_mats : List[np.array] = []
-	cumulative_mats.append(last_matrix)
+	cumulative_mats.append(initial_matrix)
 	
 	for i, phi in enumerate(list(Phi)):
 
@@ -379,8 +379,11 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 		# get current Li plus some offset due to the joint
 		neutral_Li_vec = np.array([Li , 0 , 0])
-		if i != 0:
-			neutral_Li_vec = neutral_Li_vec +  2 * np.array([r1, 0, 0])
+		if i > 0 and i < len(Phi) - 1: 
+			neutral_Li_vec = neutral_Li_vec +  2 * joint_offset
+		elif i == 0:
+			neutral_Li_vec = neutral_Li_vec +  1 * joint_offset
+
 
 
 		# multiply the Li vector into the last matrix
@@ -400,7 +403,13 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		answers.append(cumulative_transform[0:3, -1])
 		cumulative_mats.append(current_transform)
 
-		last_matrix = current_transform
+
+	cumulative_transform = np.eye(4)
+
+	for mat in cumulative_mats:
+		cumulative_transform = mat @ cumulative_transform
+	
+	ic(cumulative_transform)
 
 	vp.show(frames, axes, viewup="z" ,interactive=True)
 	assert len(answers) == 4
