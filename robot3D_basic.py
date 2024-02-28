@@ -500,6 +500,7 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 				print(f"Arm matrix is {arm_mat_pair}")
 				height = arm_mat_pair[1][0, -1]
 				ic(height)
+				ic(cum_mat)
 				arm_offset = np.array([(height)/2, 0, 0])
 				comp_frame+= Cylinder(pos=arm_offset, c=colors[length_counter], r=r1, axis=(1,0,0), height=height, alpha=0.7 )
 
