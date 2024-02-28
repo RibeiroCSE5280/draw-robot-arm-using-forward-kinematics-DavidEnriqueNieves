@@ -349,16 +349,11 @@ def get_end_effector(r1 : float, cumulative_mats : np.array, to_print : bool = F
 	for i, mat in enumerate(reversed(transforms)):
 		cumulative_transform = mat @ cumulative_transform
 		if(to_print):
-			# print(f"Multiplying by ")
+			ic(i)
+			print(f"Multiplying by ")
 			ic(mat)
-			ic(cumulative_transform)
-
-		if i == 0:
-			offset = np.zeros(3)
-		else:
-			offset = joint_offset
-
-		end_effector = cumulative_transform[0:3,-1]  - offset
+			# print(f"Cumulative is ")
+			# ic(cumulative_transform)
 
 		# if(to_print):
 		# 	print(f"p{i+1} =  {end_effector}")
@@ -367,26 +362,6 @@ def get_end_effector(r1 : float, cumulative_mats : np.array, to_print : bool = F
 	if(to_print):
 		ic(cumulative_transform)
 	return cumulative_transform, cumulative_transform[0:3, -1]
-
-def aggregate_frames(cumulative_mats : List[np.array]) -> List[Mesh]:
-
-	_, end_effector = get_end_effector(cumulative_mats, to_print=False)
-
-	current_transform : np.array = np.eye(4)
-	for mat in cumulative_mats:
-		current_transform = mat @ current_transform
-		current_p : np.array = mat[0:3, -1]
-		ic(current_p)
-		print("Local position")
-		local_pos = end_effector - current_p
-		ic(local_pos)
-		ic("end position is ")
-		ic(apply_transformation(current_transform, np.expand_dims(local_pos, axis=1)))
-
-	# ic(end_effector)
-	# frames.append(Sphere(pos=neutral_Li_vec, r=r1).apply_transform(cumulative_transform))
-	# frames.append(Cylinder(r=r1, pos=end_effector, height=(Li/2),axis=(1,0,0), alpha=.8, c=colors[i]).apply_transform(cumulative_transform))
-
 
 def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : float):
 	settings.default_backend = 'vtk'
@@ -420,6 +395,9 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 	inital_joint_offset = np.eye(4)
 	inital_joint_offset[0:3, -1] = joint_offset
 	cumulative_mats.append(inital_joint_offset)
+
+	first_zero_index = lengths.index(0)
+	ic(first_zero_index)
 	
 	for i, phi in enumerate(list(Phi)):
 
@@ -434,28 +412,35 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		# 	end_effector_loc += np.array([2*r1, 0, 0])
 
 		# get current Li plus some offset due to the joint
-		neutral_Li_vec = np.array([Li , 0 , 0])
-		offset = 1 * joint_offset
 
-		neutral_Li_vec = neutral_Li_vec + offset
+		neutral_Li_vec : np.array = np.array([Li, 0, 0])
+
 
 		# multiply the Li vector into the last matrix
 		current_transform = get_rotation_and_translation_matrix(-1 * phi, neutral_Li_vec, axis_name="z")
-		ic(current_transform)
 		# need to add the offset of the bottom half of the joint to the current_transform matrix
-
-		cumulative_transform = np.eye(4)
 
 		# cumulative_transform, end_effector = get_end_effector(cumulative_mats, to_print=False)
 		# answers.append(cumulative_transform[0:3, -1])
 		answers.append(np.eye(4))
+
+		pre_offset_mat = np.eye(4)
+		if i < first_zero_index and i > 0:
+			pre_offset_mat[0:3, -1] = joint_offset
+
+		cumulative_mats.append(pre_offset_mat)
+
 		cumulative_mats.append(current_transform)
+
+		post_offset_mat = np.eye(4)
+		if i < first_zero_index-1:
+			post_offset_mat[0:3, -1] = joint_offset
+
+		cumulative_mats.append(post_offset_mat)
 		# ic(cumulative_transform)
 		# ic(end_effector)
 
-
-	# print("Aggregating frames")
-	# aggregate_frames(cumulative_mats)
+	ic(cumulative_mats)
 
 	_ , e = get_end_effector(r1,cumulative_mats, to_print=True)
 	# vp.show(frames, axes, viewup="z" ,interactive=True)
@@ -463,138 +448,42 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 	print(f"Final position is {e}")
 	answers.append(e)
 
-	# Function implementation goes here
+	# # Function implementation goes here
 	return tuple(answers)
 
+def assert_3():
+	print("##############################")
+	print("  Assertion 3")
+	print("##############################")
 
-def getLocalFrameMatrix(R_ij, t_ij): 
-		"""Returns the matrix representing the local frame
-		Args:
-			R_ij: rotation of Frame j w.r.t. Frame i 
-			t_ij: translation of Frame j w.r.t. Frame i 
-		Returns:
-			T_ij: Matrix of Frame j w.r.t. Frame i. 
-			
-		"""             
-		# Rigid-body transformation [ R t ]
-		T_ij = np.block([[R_ij,                t_ij],
-										 [np.zeros((1, 3)),       1]])
+	# Lentghs of the parts
+	L1, L2, L3, L4 = [5, 8, 3, 0]
+	Phi = np.array([-30, 50, 30, 0])
+	T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
+	
+	actual = e
+	expected = np.array([18.47772028,  4.71432837,  0. ])
+
+	print(f"{expected=}, {actual=}")
+	assert np.allclose(expected, actual)
+
+def assert_1():
+	print("##############################")
+	print("  Assertion 1")
+	print("##############################")
 		
-		return T_ij
+	# Lentghs of the parts
+	L1, L2, L3, L4 = [5, 8, 3, 0]
+	Phi = np.array([30, -50, -30, 0])
+	T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
 	
+	actual = e
+	expected = np.array([18.47772028, -0.71432837,  0. ])
 
-def main():
-	settings.default_backend = 'vtk'
-	# Set the limits of the graph x, y, and z ranges 
-	axes = Axes(xrange=(0,20), yrange=(-2,10), zrange=(0,6))
+	print(f"{expected=}, {actual=}")
+	assert np.allclose(expected, actual)
 
-	# vp = Plotter(offscreen=True)
-	vp = Plotter()
-
-	# Lengths of arm parts 
-	L1 = 5   # Length of link 1
-	L2 = 8   # Length of link 2
-
-	# Joint angles 
-	phi1 = 30     # Rotation angle of part 1 in degrees
-	phi2 = -10    # Rotation angle of part 2 in degrees
-	phi3 = 0      # Rotation angle of the end-effector in degrees
-	
-	# Matrix of Frame 1 (written w.r.t. Frame 0, which is the previous frame) 
-	R_01 = RotationMatrix(phi1, axis_name = 'z')   # Rotation matrix
-	p1   = np.array([[3],[2], [0.0]])              # Frame's origin (w.r.t. previous frame)
-	t_01 = p1                                      # Translation vector
-	
-	T_01 = getLocalFrameMatrix(R_01, t_01)         # Matrix of Frame 1 w.r.t. Frame 0 (i.e., the world frame)
-	
-	# Create the coordinate frame mesh and transform
-	Frame1Arrows = createCoordinateFrameMesh()
-	
-	# Now, let's create a cylinder and add it to the local coordinate frame
-	link1_mesh = Cylinder(r=0.4, 
-												height=L1, 
-												pos = (L1/2,0,0),
-												c="yellow", 
-												alpha=.8, 
-												axis=(1,0,0)
-												)
-	
-	# Also create a sphere to show as an example of a joint
-	r1 = 0.4
-	sphere1 = Sphere(r=r1).pos(-r1,0,0).color("gray").alpha(.8)
-
-	# Combine all parts into a single object 
-	Frame1 = Frame1Arrows + link1_mesh + sphere1
-
-	# Transform the part to position it at its correct location and orientation 
-	Frame1.apply_transform(T_01)  
-	
-	# Matrix of Frame 2 (written w.r.t. Frame 1, which is the previous frame) 	
-	R_12 = RotationMatrix(phi2, axis_name = 'z')   # Rotation matrix
-	p2   = np.array([[L1],[0.0], [0.0]])           # Frame's origin (w.r.t. previous frame)
-	t_12 = p2                                      # Translation vector
-	
-	# Matrix of Frame 2 w.r.t. Frame 1 
-	T_12 = getLocalFrameMatrix(R_12, t_12)
-	
-	# Matrix of Frame 2 w.r.t. Frame 0 (i.e., the world frame)
-	T_02 = T_01 @ T_12
-	
-	# Create the coordinate frame mesh and transform
-	Frame2Arrows = createCoordinateFrameMesh()
-	
-	# Now, let's create a cylinder and add it to the local coordinate frame
-	link2_mesh = Cylinder(r=0.4, 
-												height=L2, 
-												pos = (L2/2,0,0),
-												c="red", 
-												alpha=.8, 
-												axis=(1,0,0)
-												)
-	
-	# Combine all parts into a single object 
-	Frame2 = Frame2Arrows + link2_mesh
-	
-	# Transform the part to position it at its correct location and orientation 
-	Frame2.apply_transform(T_02)  
-	
-	# Matrix of Frame 3 (written w.r.t. Frame 2, which is the previous frame) 	
-	R_23 = RotationMatrix(phi3, axis_name = 'z')   # Rotation matrix
-	p3   = np.array([[L2],[0.0], [0.0]])           # Frame's origin (w.r.t. previous frame)
-	t_23 = p3                                      # Translation vector
-	
-	# Matrix of Frame 3 w.r.t. Frame 2 
-	T_23 = getLocalFrameMatrix(R_23, t_23)
-	
-	# Matrix of Frame 3 w.r.t. Frame 0 (i.e., the world frame)
-	T_03 = T_01 @ T_12 @ T_23
-	
-	# Create the coordinate frame mesh and transform. This point is the end-effector. So, I am 
-	# just creating the coordinate frame. 
-	Frame3 = createCoordinateFrameMesh()
-
-	# Transform the part to position it at its correct location and orientation 
-	Frame3.apply_transform(T_03)  
-
-	output_path : Path = Path("./output")
-
-	# Show everything 
-	print(f"Saving to path")
-	print(output_path / Path("1").with_suffix(".png"))
-	path = output_path / Path("1")
-	# vp.show([Frame1, Frame2, Frame3], axes, viewup="z" ,interactive=False).screenshot(path)
-	vp.show([Frame1, Frame2, Frame3], axes, viewup="z" ,interactive=True)
-	screenshot("output.png")
-
-	Frame1.apply_transform(T_01)
-	path = output_path / Path("2")
-
-	# vp.show([Frame1, Frame2, Frame3], axes, viewup="z" ,interactive=False).screenshot(path)
-	vp.show([Frame1, Frame2, Frame3], axes, viewup="z" ,interactive=True)
-
-
-if __name__ == '__main__':
-
+def assert_2():
 	print("##############################")
 	print("  Assertion 2")
 	print("##############################")
@@ -613,17 +502,6 @@ if __name__ == '__main__':
 	ic(assert1)
 
 
-	print("##############################")
-	print("  Assertion 3")
-	print("##############################")
-
-	# Lentghs of the parts
-	L1, L2, L3, L4 = [5, 8, 3, 0]
-	Phi = np.array([-30, 50, 30, 0])
-	T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
-	
-	actual = e
-	expected = np.array([18.47772028,  4.71432837,  0. ])
-
-	print(f"{expected=}, {actual=}")
-	assert np.allclose(expected, actual)
+if __name__ == '__main__':
+	assert_1()
+	# assert_2()
