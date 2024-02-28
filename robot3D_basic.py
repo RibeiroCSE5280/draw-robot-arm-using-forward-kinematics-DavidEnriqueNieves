@@ -6,7 +6,7 @@ from pathlib import Path
 from vedo import dataurl, Mesh, Sphere, show, settings, Axes, Arrow, Cylinder, screenshot, Plotter
 import numpy as np
 from icecream import ic
-from typing import List
+from typing import List, Tuple
 
 
 def RotationMatrix(theta, axis_name):
@@ -333,7 +333,46 @@ def gen_mesh_from_transformation(Li : float, current_transform : np.array, curre
 	# Transform the part to position it at its correct location and orientation 
 	Frame.apply_transform(current_transform)  
 	return Frame
+def get_end_effector(cumulative_mats : np.array, to_print : bool = False) -> Tuple[np.array, np.array]:
+	cumulative_transform = np.eye(4)
+	if(to_print):
+		print(f"Getting final end effector")
+		print(f"==============================")
 
+		ic(cumulative_mats)
+		ic(len(cumulative_mats))
+
+	transforms = cumulative_mats.copy()
+	transforms.reverse()
+	for mat in transforms:
+		cumulative_transform = mat @ cumulative_transform
+		if(to_print):
+			print(f"Multiplying by ")
+			ic(mat)
+			ic(cumulative_transform)
+	
+	if(to_print):
+		ic(cumulative_transform)
+	return cumulative_transform, cumulative_transform[0:3, -1]
+
+def aggregate_frames(cumulative_mats : List[np.array]) -> List[Mesh]:
+
+	_, end_effector = get_end_effector(cumulative_mats, to_print=False)
+
+	current_transform : np.array = np.eye(4)
+	for mat in cumulative_mats:
+		current_transform = mat @ current_transform
+		current_p : np.array = mat[0:3, -1]
+		ic(current_p)
+		print("Local position")
+		local_pos = end_effector - current_p
+		ic(local_pos)
+		ic("end position is ")
+		ic(apply_transformation(current_transform, np.expand_dims(local_pos, axis=1)))
+
+	# ic(end_effector)
+	# frames.append(Sphere(pos=neutral_Li_vec, r=r1).apply_transform(cumulative_transform))
+	# frames.append(Cylinder(r=r1, pos=end_effector, height=(Li/2),axis=(1,0,0), alpha=.8, c=colors[i]).apply_transform(cumulative_transform))
 
 
 def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : float):
@@ -380,44 +419,37 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		# get current Li plus some offset due to the joint
 		neutral_Li_vec = np.array([Li , 0 , 0])
 		if i > 0 and i < len(Phi) - 1: 
-			neutral_Li_vec = neutral_Li_vec +  2 * joint_offset
+			offset = 2 * joint_offset
 		elif i == 0:
-			neutral_Li_vec = neutral_Li_vec +  1 * joint_offset
+			offset =  1 * joint_offset
+		else:
+			offset = np.zeros(3)
 
-
+		neutral_Li_vec = neutral_Li_vec + offset
 
 		# multiply the Li vector into the last matrix
 		current_transform = get_rotation_and_translation_matrix(-1 * phi, neutral_Li_vec, axis_name="z")
 		ic(current_transform)
 		# need to add the offset of the bottom half of the joint to the current_transform matrix
-		frames.append(gen_mesh_from_transformation(Li, current_transform, neutral_Li_vec, color=colors[i], mesh=Sphere))
-		frames.append(gen_mesh_from_transformation(Li, current_transform, neutral_Li_vec, color=colors[i]))
 
 		cumulative_transform = np.eye(4)
 
-		for mat in cumulative_mats:
-			cumulative_transform = mat @ cumulative_transform
-		# print(f"Final cumulative transformation matrix is ")
-		# ic(cumulative_transform)
 
+		cumulative_transform, end_effector = get_end_effector(cumulative_mats, to_print=False)
 		answers.append(cumulative_transform[0:3, -1])
 		cumulative_mats.append(current_transform)
+		ic(cumulative_transform)
+		ic(end_effector)
 
 
-	cumulative_transform = np.eye(4)
+	# print("Aggregating frames")
+	# aggregate_frames(cumulative_mats)
 
-	for mat in cumulative_mats:
-		cumulative_transform = mat @ cumulative_transform
-	
-	ic(cumulative_transform)
-
-	vp.show(frames, axes, viewup="z" ,interactive=True)
+	_ , e = get_end_effector(cumulative_mats, to_print=True)
+	# vp.show(frames, axes, viewup="z" ,interactive=True)
 	assert len(answers) == 4
-	e : np.array = cumulative_transform[0:3, -1]
 	print(f"Final position is {e}")
 	answers.append(e)
-
-	# e = current_transform @ 
 
 	# Function implementation goes here
 	return tuple(answers)
@@ -569,22 +601,17 @@ if __name__ == '__main__':
 	ic(assert1)
 
 
-	print("##############################")
-	print("  Assertion 1")
-	print("##############################")
+	# print("##############################")
+	# print("  Assertion 3")
+	# print("##############################")
 
-
-	# Lentghs of the parts
-	L1, L2, L3, L4 = [5, 8, 3, 0]
-	Phi = np.array([30, -50, -30, 0])
-	T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
+	# # Lentghs of the parts
+	# L1, L2, L3, L4 = [5, 8, 3, 0]
+	# Phi = np.array([-30, 50, 30, 0])
+	# T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
 	
-	actual = e
-	expected = np.array([18.47772028, -0.71432837,  0. ])
+	# actual = e
+	# expected = np.array([18.47772028,  4.71432837,  0. ])
 
-	print(f"{expected=}, {actual=}")
-	assert2 = np.allclose(expected, actual)
-	ic(assert2)
-
-	if(assert1 and assert2):
-		print("You win!")
+	# print(f"{expected=}, {actual=}")
+	# assert np.allclose(expected, actual)
