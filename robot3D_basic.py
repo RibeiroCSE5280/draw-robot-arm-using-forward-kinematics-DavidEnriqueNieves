@@ -421,18 +421,26 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		# cumulative_transform, end_effector = get_end_effector(cumulative_mats, to_print=False)
 		# answers.append(cumulative_transform[0:3, -1])
 		answers.append(np.eye(4))
-	
-		pre_offset_mat = get_rotation_and_translation_matrix(-1 * phi, joint_offset, axis_name="z")
 
-		if i > first_zero_index-1:
+		phi_mult : int = 1
+	
+
+		if i == 0:
+			pre_offset_mat = get_rotation_and_translation_matrix(phi_mult * phi, joint_offset, axis_name="z")
+		elif i < first_zero_index:
+			pre_offset_mat = get_rotation_and_translation_matrix(0, joint_offset, axis_name="z")
+		else:
 			pre_offset_mat = np.eye(4)
 
 		cumulative_mats.append(pre_offset_mat)
 		cumulative_mats.append(current_transform)
 
 		post_offset_mat = np.eye(4)
-		if i < first_zero_index - 1:
-			post_offset_mat[0:3, -1] = joint_offset
+		if i < first_zero_index - 1 and i < len(Phi) - 1:
+			# post_offset_mat[0:3, -1] = joint_offset
+			next_angle : float = Phi[i+1]
+			ic(next_angle)
+			post_offset_mat = get_rotation_and_translation_matrix(phi_mult * next_angle, joint_offset, axis_name="z" )
 		print("Adding post offset matrix")
 		ic(post_offset_mat)
 
