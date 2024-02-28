@@ -392,10 +392,6 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 	cumulative_mats : List[np.array] = []
 	cumulative_mats.append(initial_matrix)
 
-	inital_joint_offset = np.eye(4)
-	inital_joint_offset[0:3, -1] = joint_offset
-	cumulative_mats.append(inital_joint_offset)
-
 	first_zero_index = lengths.index(0)
 	ic(first_zero_index)
 	
@@ -417,16 +413,15 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 
 		# multiply the Li vector into the last matrix
-		current_transform = get_rotation_and_translation_matrix(-1 * phi, neutral_Li_vec, axis_name="z")
+		# current_transform = get_rotation_and_translation_matrix(-1 * phi, neutral_Li_vec, axis_name="z")
+		current_transform = get_rotation_and_translation_matrix(0, neutral_Li_vec, axis_name="z")
 		# need to add the offset of the bottom half of the joint to the current_transform matrix
 
 		# cumulative_transform, end_effector = get_end_effector(cumulative_mats, to_print=False)
 		# answers.append(cumulative_transform[0:3, -1])
 		answers.append(np.eye(4))
-
-		pre_offset_mat = np.eye(4)
-		if i < first_zero_index and i > 0:
-			pre_offset_mat[0:3, -1] = joint_offset
+	
+		pre_offset_mat = get_rotation_and_translation_matrix(-1 * phi, joint_offset, axis_name="z")
 
 		cumulative_mats.append(pre_offset_mat)
 
