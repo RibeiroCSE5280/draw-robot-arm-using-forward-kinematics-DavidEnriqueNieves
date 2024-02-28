@@ -2,6 +2,7 @@
 # coding: utf-8
 
 from pathlib import Path
+from argparse import ArgumentParser
 
 from vedo import dataurl, Mesh, Sphere, show, settings, Axes, Arrow, Cylinder, screenshot, Plotter
 import numpy as np
@@ -423,13 +424,17 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 	
 		pre_offset_mat = get_rotation_and_translation_matrix(-1 * phi, joint_offset, axis_name="z")
 
-		cumulative_mats.append(pre_offset_mat)
+		if i > first_zero_index-1:
+			pre_offset_mat = np.eye(4)
 
+		cumulative_mats.append(pre_offset_mat)
 		cumulative_mats.append(current_transform)
 
 		post_offset_mat = np.eye(4)
-		if i < first_zero_index-1:
+		if i < first_zero_index - 1:
 			post_offset_mat[0:3, -1] = joint_offset
+		print("Adding post offset matrix")
+		ic(post_offset_mat)
 
 		cumulative_mats.append(post_offset_mat)
 		# ic(cumulative_transform)
@@ -498,5 +503,19 @@ def assert_2():
 
 
 if __name__ == '__main__':
+
+	argparser = ArgumentParser()
+	argparser.add_argument("--debug", action="store_true")
+
+	args = argparser.parse_args()
+
+	PORT : int = 5678
+	if (args.debug):
+		print(f"Waiting for client on port {PORT}")
+		import debugpy
+		debugpy.listen(PORT)
+		debugpy.wait_for_client()
+
+	
 	assert_1()
 	# assert_2()
