@@ -333,7 +333,7 @@ def gen_mesh_from_transformation(Li : float, current_transform : np.array, curre
 	# Transform the part to position it at its correct location and orientation 
 	Frame.apply_transform(current_transform)  
 	return Frame
-def get_end_effector(cumulative_mats : np.array, to_print : bool = False) -> Tuple[np.array, np.array]:
+def get_end_effector(r1 : float, cumulative_mats : np.array, to_print : bool = False) -> Tuple[np.array, np.array]:
 	cumulative_transform = np.eye(4)
 	if(to_print):
 		print(f"Getting final end effector")
@@ -341,15 +341,28 @@ def get_end_effector(cumulative_mats : np.array, to_print : bool = False) -> Tup
 
 		ic(cumulative_mats)
 		ic(len(cumulative_mats))
+	joint_offset = np.array([r1, 0, 0])
 
 	transforms = cumulative_mats.copy()
-	transforms.reverse()
-	for mat in transforms:
+
+	# transforms = transforms[::-1]
+	for i, mat in enumerate(reversed(transforms)):
 		cumulative_transform = mat @ cumulative_transform
 		if(to_print):
-			print(f"Multiplying by ")
+			# print(f"Multiplying by ")
 			ic(mat)
 			ic(cumulative_transform)
+
+		if i == 0:
+			offset = np.zeros(3)
+		else:
+			offset = joint_offset
+
+		end_effector = cumulative_transform[0:3,-1]  - offset
+
+		# if(to_print):
+		# 	print(f"p{i+1} =  {end_effector}")
+
 	
 	if(to_print):
 		ic(cumulative_transform)
@@ -403,6 +416,10 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 	cumulative_mats : List[np.array] = []
 	cumulative_mats.append(initial_matrix)
+
+	inital_joint_offset = np.eye(4)
+	inital_joint_offset[0:3, -1] = joint_offset
+	cumulative_mats.append(inital_joint_offset)
 	
 	for i, phi in enumerate(list(Phi)):
 
@@ -413,17 +430,12 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 		ic(Li)
 		# print(f"Generating rotation matrix for part {i}")
 
-		# if i > 1 and i < len(Phi):
+		# if i > 1 and i < len(Phi)
 		# 	end_effector_loc += np.array([2*r1, 0, 0])
 
 		# get current Li plus some offset due to the joint
 		neutral_Li_vec = np.array([Li , 0 , 0])
-		if i > 0 and i < len(Phi) - 1: 
-			offset = 2 * joint_offset
-		elif i == 0:
-			offset =  1 * joint_offset
-		else:
-			offset = np.zeros(3)
+		offset = 1 * joint_offset
 
 		neutral_Li_vec = neutral_Li_vec + offset
 
@@ -434,18 +446,18 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 		cumulative_transform = np.eye(4)
 
-
-		cumulative_transform, end_effector = get_end_effector(cumulative_mats, to_print=False)
-		answers.append(cumulative_transform[0:3, -1])
+		# cumulative_transform, end_effector = get_end_effector(cumulative_mats, to_print=False)
+		# answers.append(cumulative_transform[0:3, -1])
+		answers.append(np.eye(4))
 		cumulative_mats.append(current_transform)
-		ic(cumulative_transform)
-		ic(end_effector)
+		# ic(cumulative_transform)
+		# ic(end_effector)
 
 
 	# print("Aggregating frames")
 	# aggregate_frames(cumulative_mats)
 
-	_ , e = get_end_effector(cumulative_mats, to_print=True)
+	_ , e = get_end_effector(r1,cumulative_mats, to_print=True)
 	# vp.show(frames, axes, viewup="z" ,interactive=True)
 	assert len(answers) == 4
 	print(f"Final position is {e}")
@@ -601,17 +613,17 @@ if __name__ == '__main__':
 	ic(assert1)
 
 
-	# print("##############################")
-	# print("  Assertion 3")
-	# print("##############################")
+	print("##############################")
+	print("  Assertion 3")
+	print("##############################")
 
-	# # Lentghs of the parts
-	# L1, L2, L3, L4 = [5, 8, 3, 0]
-	# Phi = np.array([-30, 50, 30, 0])
-	# T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
+	# Lentghs of the parts
+	L1, L2, L3, L4 = [5, 8, 3, 0]
+	Phi = np.array([-30, 50, 30, 0])
+	T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4)
 	
-	# actual = e
-	# expected = np.array([18.47772028,  4.71432837,  0. ])
+	actual = e
+	expected = np.array([18.47772028,  4.71432837,  0. ])
 
-	# print(f"{expected=}, {actual=}")
-	# assert np.allclose(expected, actual)
+	print(f"{expected=}, {actual=}")
+	assert np.allclose(expected, actual)
