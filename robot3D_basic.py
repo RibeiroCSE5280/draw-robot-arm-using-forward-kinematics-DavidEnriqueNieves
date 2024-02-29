@@ -480,6 +480,8 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 
 	# transforms = transforms[::-1]
 	last_joint_coords = [np.zeros(0), np.zeros(0)]
+	cum_mats : List[np.array] = []
+	arm_counter = 0
 	for i, (type, mat) in enumerate(rev_mats):
 		print("------------------------------")
 		cum_mat = cum_mat @ mat
@@ -490,26 +492,28 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 			# print(f"Cumulative is ")
 			# ic(cumulative_transform)
 
-		sphere_coords = np.array([r1/4,0,0])
+		sphere_coords = np.array([r1,0,0])
 		calc_sphere_coords = np.expand_dims(sphere_coords,axis=1)
 
-		if type == SEGMENT_TYPE.UPPER_JOINT:
+		if type == SEGMENT_TYPE.UPPER_JOINT and i != len(rev_mats) - first_zero_index:
 			print("Appending joint...")
-			frames.append(Sphere(pos=sphere_coords, r=r1, alpha=0.8).apply_transform(cum_mat))
-			coords_mat = apply_transformation(cum_mat, calc_sphere_coords)
-			last_joint_coords[1] = coords_mat[0:3,-1]
-			middle_coord = (last_joint_coords[0] + last_joint_coords[1])/2
+			print("Getting arm matrix")
+			ic(rev_mats[i+1])
+			height = rev_mats[i+1][1][0, -1]
+			cylinder = Cylinder(height=height, pos=(((height)/2 + r1),0,0), r=r1, alpha=0.8, axis=(1,0,0), c=colors[arm_counter])
+			sphere = Sphere(pos=sphere_coords/2, r=r1, alpha=0.8)
+			combined = cylinder + sphere
+			frames.append(combined.apply_transform(cum_mats[-1]))
+			arm_counter+=1
 			# frames.append(Sphere(pos=middle_coord, r=r1, alpha=0.8, c="purple").apply_transform(cum_mat))
 
 		if type == SEGMENT_TYPE.LOWER_JOINT:
 			print("Appending joint...")
 			# frames.append(Sphere(pos=sphere_coords, r=r1, alpha=0.8).apply_transform(cum_mat))
-			coords_mat = apply_transformation(cum_mat, calc_sphere_coords )
-			last_joint_coords[0] = coords_mat[0:3,-1]
 		elif type == SEGMENT_TYPE.ARM:
 			print("Appending arm...")
-			height = mat[0, -1]
-			frames.append(Cylinder(height=height-r1, pos=(-1 * ((height)/2) + r1,0,0), r=r1, alpha=0.8, axis=(1,0,0)).apply_transform(cum_mat))
+			# frames.append().apply_transform(cum_mat))
+		cum_mats.append(cum_mat)
 
 	last_transform = cum_mat
 	ic(last_transform)
@@ -587,6 +591,6 @@ if __name__ == '__main__':
 		debugpy.wait_for_client()
 
 	
-	# assert_1()
-	assert_2()
+	assert_1()
+	# assert_2()
 	# assert_3()
