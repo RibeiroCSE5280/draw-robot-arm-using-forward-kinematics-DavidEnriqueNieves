@@ -371,7 +371,11 @@ def get_end_effector(r1 : float, cumulative_mats : np.array, to_print : bool = F
 		ic(cumulative_transform)
 	return cumulative_transform, cumulative_transform[0:3, -1]
 
-def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : float):
+def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : float, index : int = None):
+
+	if index == None:
+		index = 0
+
 	settings.default_backend = 'vtk'
 	# begin by drawing the robot in its base form
 
@@ -518,8 +522,11 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 	last_transform = cum_mat
 	ic(last_transform)
 
-	vp.show(frames, axes, viewup="z" ,interactive=True)
+	vp.show(frames, axes, interactive=False, viewup=(1,0,0))
+	vp.screenshot(f"./output/output_{index}.png")
+	vp.close()
 	assert len(answers) == 4
+
 	answers.append(e)
 
 	# # Function implementation goes here
@@ -593,4 +600,22 @@ if __name__ == '__main__':
 	
 	assert_1()
 	# assert_2()
-	# assert_3()
+	# assert_3 ()
+
+	L1, L2, L3, L4 = [5, 8, 3, 0]
+
+	Phi1 = np.linspace(-20, 30, 50)
+	Phi2 = np.linspace(-70, -50, 50)
+	Phi3 = np.linspace(-20, -30, 50)
+	Phi4 = np.linspace(0, 0, 50)
+	thing = np.array([Phi1, Phi2, Phi3, Phi4])
+	ic(thing)
+
+	for i, pair in enumerate(zip(thing[0], thing[1], thing[2], thing[3])):
+		ic(pair)
+		Phi = np.array([pair[0], pair[1], pair[2], pair[3]])
+		ic(Phi)
+		T_01, T_02, T_03, T_04, e = forward_kinematics(Phi, L1, L2, L3, L4, index=i)
+	
+	# actual = e
+	# expected = np.array([18.47772028, -0.71432837,  0. ])
