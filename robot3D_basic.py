@@ -522,9 +522,9 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 	last_transform = cum_mat
 	ic(last_transform)
 
-	vp.show(frames, axes, interactive=False, viewup=(1,0,0))
-	vp.screenshot(f"./output/output_{index}.png")
-	vp.close()
+	# vp.show(frames, axes, interactive=False, viewup=(1,0,0))
+	# vp.screenshot(f"./output/output_{index}.png")
+	# vp.close()
 	assert len(answers) == 4
 
 	answers.append(e)
