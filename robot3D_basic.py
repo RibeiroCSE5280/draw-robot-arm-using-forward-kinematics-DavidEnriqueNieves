@@ -472,44 +472,47 @@ def forward_kinematics(Phi : np.array, L1 : float, L2 : float, L3 : float, L4 : 
 	cum_mat = np.eye(4)
 	print(f"Final position is {e}")
 
-	length_counter = 0
-	cum_mats : List[np.array] = []
-	mats : List[np.array] = segment_mats.copy()
-
 	print(f"DRAWING ARM!")
 
-	ic(lengths)
-	# ic(segment_mats)
-	rev_seg_mats = list(segment_mats)
-	ic(rev_seg_mats)
-	for i, pair in enumerate(rev_seg_mats):
-		type, mat = pair
-		ic((type, mat))
-		ic(length_counter)
+	cum_mat = np.eye(4)
 
+	rev_mats = list(segment_mats.copy())
+
+	# transforms = transforms[::-1]
+	last_joint_coords = [np.zeros(0), np.zeros(0)]
+	for i, (type, mat) in enumerate(rev_mats):
+		print("------------------------------")
+		cum_mat = cum_mat @ mat
 		ic(i)
+		ic((type, mat))
+		ic(cum_mat)
+		print(f"Multiplying by ")
+			# print(f"Cumulative is ")
+			# ic(cumulative_transform)
+
+		sphere_coords = np.array([r1/4,0,0])
+		calc_sphere_coords = np.expand_dims(sphere_coords,axis=1)
+
+		if type == SEGMENT_TYPE.UPPER_JOINT:
+			print("Appending joint...")
+			frames.append(Sphere(pos=sphere_coords, r=r1, alpha=0.8).apply_transform(cum_mat))
+			coords_mat = apply_transformation(cum_mat, calc_sphere_coords)
+			last_joint_coords[1] = coords_mat[0:3,-1]
+			middle_coord = (last_joint_coords[0] + last_joint_coords[1])/2
+			# frames.append(Sphere(pos=middle_coord, r=r1, alpha=0.8, c="purple").apply_transform(cum_mat))
+
 		if type == SEGMENT_TYPE.LOWER_JOINT:
-			print("Adding lower joint")
-			ic(cum_mat)
-			joint_half_offset = np.array([-r1, 0,0])
-			if i < len(rev_seg_mats) -1:
-				comp_frame = Sphere(pos=joint_half_offset,c="purple", r=r1, alpha=0.8) 
+			print("Appending joint...")
+			# frames.append(Sphere(pos=sphere_coords, r=r1, alpha=0.8).apply_transform(cum_mat))
+			coords_mat = apply_transformation(cum_mat, calc_sphere_coords )
+			last_joint_coords[0] = coords_mat[0:3,-1]
+		elif type == SEGMENT_TYPE.ARM:
+			print("Appending arm...")
+			height = mat[0, -1]
+			frames.append(Cylinder(height=height-r1, pos=(-1 * ((height)/2) + r1,0,0), r=r1, alpha=0.8, axis=(1,0,0)).apply_transform(cum_mat))
 
-			if i < len(rev_seg_mats)-2:
-				arm_mat_pair = rev_seg_mats[i+2]
-				print(f"Arm matrix is {arm_mat_pair}")
-				height = arm_mat_pair[1][0, -1]
-				ic(height)
-				ic(cum_mat)
-				arm_offset = np.array([(height)/2, 0, 0])
-				comp_frame+= Cylinder(pos=arm_offset, c=colors[length_counter], r=r1, axis=(1,0,0), height=height, alpha=0.7 )
-
-			frames.append(comp_frame.apply_transform(cum_mat))
-			length_counter+=1
-
-		cum_mat = mat @ cum_mat
-		# ic(cum_mat)
-		cum_mats.append(cum_mat)
+	last_transform = cum_mat
+	ic(last_transform)
 
 	vp.show(frames, axes, viewup="z" ,interactive=True)
 	assert len(answers) == 4
@@ -584,6 +587,6 @@ if __name__ == '__main__':
 		debugpy.wait_for_client()
 
 	
-	assert_1()
-	# assert_2()
+	# assert_1()
+	assert_2()
 	# assert_3()
